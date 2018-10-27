@@ -1,0 +1,22 @@
+UNARY = ';1;\0' => {
+    ~ 'Conversion step: \0'
+
+    /(.*);(.*);(.*)0/ ::= '\1;\2\2;\3'
+    /(.*);(.*);(.*)1/ ::= '\1\2;\2\2;\3'
+
+    /(.*);(.*);$/ ::= '\1'
+}
+
+
+FIZZ     = UNARY => /(.{3})*/ ::= ~ 'fizz'
+BUZZ     = UNARY => /(.{5})*/ ::= ~ 'buzz'
+FIZZBUZZ = UNARY => /(.{15})*/ ::= ~ 'fizzbuzz'
+
+FIZZ_BUZZ = [
+    FIZZBUZZ
+    FIZZ
+    BUZZ
+    ~ '\0'
+]
+
+':::' => FIZZ_BUZZ
