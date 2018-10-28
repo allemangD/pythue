@@ -1,44 +1,6 @@
 import re
 
-from lark import Lark, InlineTransformer, Transformer
-
-grammar = r'''
-program: suite
-
-suite: prod*
-
-?prod: _named_prod | _direct_prod
-
-_named_prod     : alias
-_direct_prod    : _compound_prod | _rule_prod | _literal_prod | _io_prod
-_io_prod  : output | input
-_compound_prod  : cont | sing
-_rule_prod      : full | part
-_literal_prod   : lit | ref
-
-alias : name "=" prod               // production alias
-output: "~" prod                    // output production
-input: ":::"                        // input production
-
-cont  : "{" suite "}"               // continual production
-sing  : "[" suite "]"               // singular production
-
-full  : _direct_prod "=>" prod      // full application
-part  : ctx "::=" prod              // partial application
-ref   : name                        // production reference
-
-lit   : STRING                      // literal production
-name  : CNAME                       // named production
-
-ctx   : REGEX
-
-CNAME : /[a-z_][a-z0-9_]*/i
-STRING: /(r)?(['"])(.*?)(?<!\\)\2/
-REGEX : /(r)?([\/])(.*?)(?<!\\)\2(i)?/
-
-%import common.WS
-%ignore WS
-'''
+import thue.parser
 
 
 class Context:
@@ -59,7 +21,7 @@ class Context:
         return diff
 
     def expand(self, fmt):
-        self.match = ALL_PAT.match(self.string)
+        self.match = thue.parser.ALL_PAT.match(self.string)
         self.string = self.match.expand(fmt)
 
     def __str__(self):
@@ -119,7 +81,7 @@ class Input:
     def apply(self, ctx):
         ctx_ = ctx.enter()
         ctx_.string = input()
-        ctx_.match = ALL_PAT.match(ctx_.string)
+        ctx_.match = thue.parser.ALL_PAT.match(ctx_.string)
         return ctx.exit(ctx_)
 
     def __str__(self):
@@ -196,70 +158,3 @@ class Program:
 
     def __str__(self):
         return f'Program[{self.suite}]'
-
-
-STRING_PAT = re.compile(r'''(r)?(['"])(.*?)(?<!\\)\2''')
-REGEX_PAT = re.compile(r'''(r)?([/])(.*?)(?<!\\)\2(i)?''')
-ALL_PAT = re.compile(r'''^.*$''')
-
-
-class ProductionTransformer(Transformer):
-    def suite(self, prods):
-        return Suite(prods)
-
-    def lit(self, prods):
-        fmt, = prods
-        match = STRING_PAT.match(fmt)
-        return Literal(match[3])
-
-    def ctx(self, prods):
-        reg, = prods
-        match = REGEX_PAT.match(reg)
-        return re.compile(match[3])
-
-    def input(self, prods):
-        return Input()
-
-    def output(self, prods):
-        prod, = prods
-        return Output(prod)
-
-    def full(self, prods):
-        lhs, rhs = prods
-        return Full(lhs, rhs)
-
-    def part(self, prods):
-        pat, rhs = prods
-        return Partial(pat, rhs)
-
-    def cont(self, prods):
-        suite, = prods
-        return Continual(suite)
-
-    def sing(self, prods):
-        suite, = prods
-        return Singular(suite)
-
-    def program(self, prods):
-        suite, = prods
-        return Program(suite)
-
-
-def main():
-    lrk = Lark(grammar, start='program')
-
-    with open('testing.ret') as f:
-        src = f.read()
-
-    tree = lrk.parse(src)
-    print(tree.pretty())
-
-    tform = ProductionTransformer()
-    pgm = tform.transform(tree)
-    print(pgm)
-    print()
-    print(pgm.run())
-
-
-if __name__ == '__main__':
-    main()
