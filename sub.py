@@ -10,14 +10,15 @@ suite: prod*
 ?prod: _named_prod | _direct_prod
 
 _named_prod     : alias
-_direct_prod    : _compound_prod | _rule_prod | _literal_prod | _abstract_prod
-_abstract_prod  : output
+_direct_prod    : _compound_prod | _rule_prod | _literal_prod | _io_prod
+_io_prod  : output | input
 _compound_prod  : cont | sing
 _rule_prod      : full | part
 _literal_prod   : lit | ref
 
 alias : name "=" prod               // production alias
 output: "~" prod                    // output production
+input: ":::"                        // input production
 
 cont  : "{" suite "}"               // continual production
 sing  : "[" suite "]"               // singular production
@@ -58,8 +59,8 @@ class Context:
         return diff
 
     def expand(self, fmt):
-        self.string = self.match.expand(fmt)
         self.match = ALL_PAT.match(self.string)
+        self.string = self.match.expand(fmt)
 
     def __str__(self):
         return f'Ctx[{self.string!r} {self.match[0]!r} {self.match.groups()}]'
@@ -112,6 +113,31 @@ class Partial:
 
     def __str__(self):
         return f'Part[{self.reg} ::= {self.rhs}]'
+
+
+class Input:
+    def apply(self, ctx):
+        ctx_ = ctx.enter()
+        ctx_.string = input()
+        ctx_.match = ALL_PAT.match(ctx_.string)
+        return ctx.exit(ctx_)
+
+    def __str__(self):
+        return 'Input'
+
+
+class Output:
+    def __init__(self, prod):
+        self.prod = prod
+
+    def apply(self, ctx):
+        _ctx = ctx.enter()
+        self.prod.apply(_ctx)
+        print(_ctx.string)
+        return False
+
+    def __str__(self):
+        return f'Output[{self.prod}]'
 
 
 class Suite:
@@ -191,6 +217,13 @@ class ProductionTransformer(Transformer):
         match = REGEX_PAT.match(reg)
         return re.compile(match[3])
 
+    def input(self, prods):
+        return Input()
+
+    def output(self, prods):
+        prod, = prods
+        return Output(prod)
+
     def full(self, prods):
         lhs, rhs = prods
         return Full(lhs, rhs)
@@ -224,6 +257,7 @@ def main():
     tform = ProductionTransformer()
     pgm = tform.transform(tree)
     print(pgm)
+    print()
     print(pgm.run())
 
 
