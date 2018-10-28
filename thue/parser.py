@@ -3,6 +3,7 @@ import re
 import lark
 from lark import Lark
 
+import thue.core
 import thue.prods
 
 grammar = r'''
@@ -87,7 +88,7 @@ class ProductionTransformer(lark.Transformer):
 
     def program(self, prods):
         suite, = prods
-        return thue.prods.Program(suite)
+        return thue.core.Program(suite)
 
 
 THUE_TRANSFORMER = ProductionTransformer()
